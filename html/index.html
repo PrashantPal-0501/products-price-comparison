@@ -1,0 +1,208 @@
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Products price comparison</title>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<style>
+  body {
+    font-family: "Times New Roman", Times, serif;
+    margin: 40px;
+    background-color: #ffffff;
+    color: #000000;
+  }
+
+  h1 {
+    font-weight: bold;
+    margin-bottom: 30px;
+  }
+
+  select {
+    font-size: 16px;
+    padding: 6px 10px;
+    margin-bottom: 14px;
+    display: block;
+    min-width: 180px;
+  }
+
+  table {
+    border-collapse: collapse;
+    margin-top: 10px;
+  }
+
+  td, th {
+    padding: 4px 12px;
+    text-align: left;
+    font-size: 18px;
+  }
+
+  /* Highlight the price column, matching original design */
+  td:nth-child(even), th:nth-child(even) {
+    background-color: #D6EEEE;
+  }
+
+  #status {
+    color: #555;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<h1>Products price comparison</h1>
+
+<select id="selProd" onchange="getDealers()">
+  <option value="">--SELECT--</option>
+</select>
+
+<select id="selDealer" onchange="renderPrices()" disabled>
+  <option value="">--SELECT--</option>
+</select>
+
+<div id="status"></div>
+<table id="priceTable"></table>
+
+<script>
+  // ---------------------------------------------------------------
+  // Backend endpoints. Empty string = same origin, i.e. the app.js
+  // Express server below (it serves this page AND the API).
+  // Point these at separate Code Engine services instead if you
+  // split the backend into its own microservice(s).
+  // ---------------------------------------------------------------
+  let prodUrl = "";
+  let dealerUrl = "";
+
+  // ---------------------------------------------------------------
+  // Local mock data (used as fallback so the page works standalone)
+  // ---------------------------------------------------------------
+  const mockProducts = ["Headphones", "Laptop", "Mouse", "Printer"];
+
+  const mockDealerPrices = {
+    "Headphones": { "Binglee": 30, "DXC Electronics": 20, "Bobay": 20 },
+    "Laptop":     { "Binglee": 900, "DXC Electronics": 850, "Bobay": 875 },
+    "Mouse":      { "Binglee": 15, "DXC Electronics": 12, "Bobay": 18 },
+    "Printer":    { "Binglee": 120, "DXC Electronics": 99, "Bobay": 110 }
+  };
+
+  const statusEl = document.getElementById("status");
+  const selProd = document.getElementById("selProd");
+  const selDealer = document.getElementById("selDealer");
+  const priceTable = document.getElementById("priceTable");
+
+  function populateProducts(products) {
+    products.forEach(p => {
+      let opt = document.createElement("option");
+      opt.value = p;
+      opt.textContent = p;
+      selProd.appendChild(opt);
+    });
+  }
+
+  function loadProducts() {
+    axios.get(prodUrl + "products")
+      .then(res => {
+        if (Array.isArray(res.data)) {
+          populateProducts(res.data);
+        } else {
+          populateProducts(mockProducts);
+        }
+      })
+      .catch(() => {
+        // backend not reachable -> use mock data
+        populateProducts(mockProducts);
+      });
+  }
+
+  function populateDealers(dealers) {
+    selDealer.innerHTML = "";
+
+    let defaultOpt = document.createElement("option");
+    defaultOpt.value = "";
+    defaultOpt.textContent = "--SELECT--";
+    selDealer.appendChild(defaultOpt);
+
+    let allOpt = document.createElement("option");
+    allOpt.value = "all";
+    allOpt.textContent = "All Dealers";
+    selDealer.appendChild(allOpt);
+
+    dealers.forEach(d => {
+      let opt = document.createElement("option");
+      opt.value = d;
+      opt.textContent = d;
+      selDealer.appendChild(opt);
+    });
+
+    selDealer.disabled = false;
+  }
+
+  function getDealers() {
+    const product = selProd.value;
+    priceTable.innerHTML = "";
+    statusEl.textContent = "";
+
+    if (!product) {
+      selDealer.innerHTML = '<option value="">--SELECT--</option>';
+      selDealer.disabled = true;
+      return;
+    }
+
+    axios.get(dealerUrl + "dealers?product=" + encodeURIComponent(product))
+      .then(res => {
+        if (Array.isArray(res.data) && res.data.length) {
+          populateDealers(res.data);
+        } else {
+          populateDealers(Object.keys(mockDealerPrices[product] || {}));
+        }
+      })
+      .catch(() => {
+        populateDealers(Object.keys(mockDealerPrices[product] || {}));
+      });
+  }
+
+  function renderPrices() {
+    const product = selProd.value;
+    const dealer = selDealer.value;
+    priceTable.innerHTML = "";
+
+    if (!product || !dealer) return;
+
+    axios.get(dealerUrl + "prices?product=" + encodeURIComponent(product) + "&dealer=" + encodeURIComponent(dealer))
+      .then(res => {
+        if (res.data && typeof res.data === "object") {
+          drawRows(res.data);
+        } else {
+          drawRows(fallbackPrices(product, dealer));
+        }
+      })
+      .catch(() => {
+        drawRows(fallbackPrices(product, dealer));
+      });
+  }
+
+  function fallbackPrices(product, dealer) {
+    const prices = mockDealerPrices[product] || {};
+    if (dealer === "all") return prices;
+    return { [dealer]: prices[dealer] };
+  }
+
+  function drawRows(prices) {
+    Object.keys(prices).forEach(name => {
+      let tr = document.createElement("tr");
+
+      let tdName = document.createElement("td");
+      tdName.textContent = name;
+
+      let tdPrice = document.createElement("td");
+      tdPrice.textContent = "$" + prices[name];
+
+      tr.appendChild(tdName);
+      tr.appendChild(tdPrice);
+      priceTable.appendChild(tr);
+    });
+  }
+
+  loadProducts();
+</script>
+
+</body>
+</html>

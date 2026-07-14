@@ -1,0 +1,12 @@
+{
+  "name": "products-price-comparison",
+  "version": "1.0.0",
+  "description": "Products price comparison app (frontend + Express API)",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
